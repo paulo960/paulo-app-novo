@@ -88,11 +88,6 @@ class _DriverAppState extends State<DriverApp> {
           secondary: Colors.amber,
           surface: Colors.white,
         ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          elevation: 0,
-        ),
       ),
       darkTheme: ThemeData(
         brightness: Brightness.dark,
@@ -103,11 +98,6 @@ class _DriverAppState extends State<DriverApp> {
           primary: Color(0xFF00E676),
           secondary: Colors.amberAccent,
           surface: Color(0xFF1E1E1E),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF1E1E1E),
-          foregroundColor: Colors.white,
-          elevation: 0,
         ),
       ),
       home: DriverHomePage(
@@ -201,9 +191,9 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
 
       await FlutterOverlayWindow.showOverlay(
         enableDrag: true,
-        overlayTitle: "Jornada em Andamento",
+        overlayTitle: "Jornada",
         overlayContent: "Paulo Luna",
-        flag: OverlayFlag.defaultFlag,
+        flag: OverlayFlag.defaultFlag, // Flag de interação padrão
         alignment: OverlayAlignment.centerRight,
         visibility: NotificationVisibility.visibilityPublic,
         positionGravity: PositionGravity.auto,
@@ -1090,7 +1080,7 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
   }
 }
 
-// Widget Flutuante com Toque e Retorno ao App
+// Widget Flutuante Interativo
 class OverlayWidget extends StatefulWidget {
   const OverlayWidget({super.key});
 
@@ -1142,42 +1132,44 @@ class _OverlayWidgetState extends State<OverlayWidget> {
   Widget build(BuildContext context) {
     return Material(
       type: MaterialType.transparency,
-      child: Center(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: _handleTap,
-          child: Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
-              color: const Color(0xF5121212),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF00E676), width: 2.8),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "EM ROTA",
-                    style: TextStyle(
-                      color: Color(0xFF00E676),
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.6,
+      child: SizedBox.expand(
+        child: Center(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _handleTap,
+            child: Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                color: const Color(0xF5121212),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF00E676), width: 2.8),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      "EM ROTA",
+                      style: TextStyle(
+                        color: Color(0xFF00E676),
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.6,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    _formatTime(_seconds),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.4,
+                    const SizedBox(height: 3),
+                    Text(
+                      _formatTime(_seconds),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.4,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
