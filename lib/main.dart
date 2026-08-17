@@ -6,12 +6,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() => runApp(const DriverApp());
 
-// Janela Flutuante Nativa sobre outros apps
+// Entry point da Janela Flutuante Nativa
 @pragma("vm:entry-point")
 void overlayMain() {
   runApp(const MaterialApp(
     debugShowCheckedModeBanner: false,
-    color: Colors.transparent,
     home: OverlayWidget(),
   ));
 }
@@ -166,6 +165,7 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
     _tabs = TabController(length: 2, vsync: this);
     _loadData();
 
+    // Quando o usuário tocar no balão flutuante fora do app
     FlutterOverlayWindow.overlayListener.listen((event) {
       if (event == "open_app") {
         _closeNativeOverlay();
@@ -195,7 +195,7 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
       bool isGranted = await FlutterOverlayWindow.isPermissionGranted();
       if (!isGranted) return;
       if (await FlutterOverlayWindow.isActive()) return;
-      
+
       await FlutterOverlayWindow.showOverlay(
         enableDrag: true,
         overlayTitle: "Jornada em Andamento",
@@ -204,9 +204,11 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
         alignment: OverlayAlignment.centerRight,
         visibility: NotificationVisibility.visibilityPublic,
         positionGravity: PositionGravity.auto,
-        height: 160,
-        width: 160,
+        height: 180,
+        width: 180,
       );
+      // Envia imediatamente os segundos atuais para o balão
+      FlutterOverlayWindow.shareData(_seconds.toString());
     } catch (_) {}
   }
 
@@ -244,31 +246,23 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
       }
     } catch (_) {}
 
-    final prefs = await SharedPreferences.getInstance();
-    int currentBase = _seconds;
-    int startEpoch = DateTime.now().millisecondsSinceEpoch - (currentBase * 1000);
-    await prefs.setInt('shift_start_epoch', startEpoch);
-    await prefs.setBool('shift_is_running', true);
-
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       setState(() => _seconds++);
+      // Transmite a contagem contínua para o balão flutuante nativo
+      FlutterOverlayWindow.shareData(_seconds.toString());
     });
     setState(() => _running = true);
   }
 
-  void _pause() async {
+  void _pause() {
     _timer?.cancel();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('shift_is_running', false);
     setState(() => _running = false);
     _closeNativeOverlay();
   }
 
-  void _reset() async {
+  void _reset() {
     _timer?.cancel();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('shift_is_running', false);
-    await prefs.remove('shift_start_epoch');
     setState(() {
       _seconds = 0;
       _running = false;
@@ -1095,7 +1089,7 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
   }
 }
 
-// Widget do Balão Nativo Flutuante Sobreposto
+// Widget Flutuante Transparente com Cronômetro em Tempo Real
 class OverlayWidget extends StatefulWidget {
   const OverlayWidget({super.key});
 
@@ -1104,38 +1098,28 @@ class OverlayWidget extends StatefulWidget {
 }
 
 class _OverlayWidgetState extends State<OverlayWidget> {
-  Timer? _timer;
   int _seconds = 0;
+  StreamSubscription? _sub;
 
   @override
   void initState() {
     super.initState();
-    _initTimer();
-  }
-
-  Future<void> _initTimer() async {
-    final prefs = await SharedPreferences.getInstance();
-    final startEpoch = prefs.getInt('shift_start_epoch');
-    final isRunning = prefs.getBool('shift_is_running') ?? false;
-
-    if (startEpoch != null && isRunning) {
-      final nowEpoch = DateTime.now().millisecondsSinceEpoch;
-      setState(() {
-        _seconds = ((nowEpoch - startEpoch) ~/ 1000);
-      });
-
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-        final currentEpoch = DateTime.now().millisecondsSinceEpoch;
-        setState(() {
-          _seconds = ((currentEpoch - startEpoch) ~/ 1000);
-        });
-      });
-    }
+    // Escuta a transmissão contínua de segundos do app principal
+    _sub = FlutterOverlayWindow.overlayListener.listen((data) {
+      if (data != null) {
+        final parsed = int.tryParse(data.toString());
+        if (parsed != null && mounted) {
+          setState(() {
+            _seconds = parsed;
+          });
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _sub?.cancel();
     super.dispose();
   }
 
@@ -1148,31 +1132,24 @@ class _OverlayWidgetState extends State<OverlayWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      type: MaterialType.transparency,
-      child: Center(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Center(
         child: GestureDetector(
           onTap: () async {
             await FlutterOverlayWindow.shareData("open_app");
           },
           child: Container(
-            width: 78,
-            height: 78,
+            width: 74,
+            height: 74,
             decoration: BoxDecoration(
-              color: const Color(0xEE121212),
+              color: const Color(0xF5121212),
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF00E676), width: 3),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x99000000),
-                  blurRadius: 10,
-                  offset: Offset(0, 4),
-                ),
-              ],
+              border: Border.all(color: const Color(0xFF00E676), width: 2.8),
             ),
             child: Center(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
                     "EM ROTA",
@@ -1180,7 +1157,7 @@ class _OverlayWidgetState extends State<OverlayWidget> {
                       color: Color(0xFF00E676),
                       fontSize: 8.5,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
+                      letterSpacing: 0.6,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -1188,9 +1165,9 @@ class _OverlayWidgetState extends State<OverlayWidget> {
                     _formatTime(_seconds),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+                      letterSpacing: 0.4,
                     ),
                   ),
                 ],
@@ -1202,4 +1179,3 @@ class _OverlayWidgetState extends State<OverlayWidget> {
     );
   }
 }
-
