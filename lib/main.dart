@@ -6,10 +6,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() => runApp(const DriverApp());
 
+// Janela Flutuante Nativa sobre outros apps
 @pragma("vm:entry-point")
 void overlayMain() {
   runApp(const MaterialApp(
     debugShowCheckedModeBanner: false,
+    color: Colors.transparent,
     home: OverlayWidget(),
   ));
 }
@@ -163,6 +165,12 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
     WidgetsBinding.instance.addObserver(this);
     _tabs = TabController(length: 2, vsync: this);
     _loadData();
+
+    FlutterOverlayWindow.overlayListener.listen((event) {
+      if (event == "open_app") {
+        _closeNativeOverlay();
+      }
+    });
   }
 
   @override
@@ -196,8 +204,8 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
         alignment: OverlayAlignment.centerRight,
         visibility: NotificationVisibility.visibilityPublic,
         positionGravity: PositionGravity.auto,
-        height: 180,
-        width: 180,
+        height: 160,
+        width: 160,
       );
     } catch (_) {}
   }
@@ -236,20 +244,31 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
       }
     } catch (_) {}
 
+    final prefs = await SharedPreferences.getInstance();
+    int currentBase = _seconds;
+    int startEpoch = DateTime.now().millisecondsSinceEpoch - (currentBase * 1000);
+    await prefs.setInt('shift_start_epoch', startEpoch);
+    await prefs.setBool('shift_is_running', true);
+
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       setState(() => _seconds++);
     });
     setState(() => _running = true);
   }
 
-  void _pause() {
+  void _pause() async {
     _timer?.cancel();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('shift_is_running', false);
     setState(() => _running = false);
     _closeNativeOverlay();
   }
 
-  void _reset() {
+  void _reset() async {
     _timer?.cancel();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('shift_is_running', false);
+    await prefs.remove('shift_start_epoch');
     setState(() {
       _seconds = 0;
       _running = false;
@@ -1076,35 +1095,106 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
   }
 }
 
-class OverlayWidget extends StatelessWidget {
+// Widget do Balão Nativo Flutuante Sobreposto
+class OverlayWidget extends StatefulWidget {
   const OverlayWidget({super.key});
+
+  @override
+  State<OverlayWidget> createState() => _OverlayWidgetState();
+}
+
+class _OverlayWidgetState extends State<OverlayWidget> {
+  Timer? _timer;
+  int _seconds = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _initTimer();
+  }
+
+  Future<void> _initTimer() async {
+    final prefs = await SharedPreferences.getInstance();
+    final startEpoch = prefs.getInt('shift_start_epoch');
+    final isRunning = prefs.getBool('shift_is_running') ?? false;
+
+    if (startEpoch != null && isRunning) {
+      final nowEpoch = DateTime.now().millisecondsSinceEpoch;
+      setState(() {
+        _seconds = ((nowEpoch - startEpoch) ~/ 1000);
+      });
+
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        final currentEpoch = DateTime.now().millisecondsSinceEpoch;
+        setState(() {
+          _seconds = ((currentEpoch - startEpoch) ~/ 1000);
+        });
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _formatTime(int s) {
+    final h = (s ~/ 3600).toString().padLeft(2, '0');
+    final m = ((s % 3600) ~/ 60).toString().padLeft(2, '0');
+    final sec = (s % 60).toString().padLeft(2, '0');
+    return '$h:$m:$sec';
+  }
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
-      child: GestureDetector(
-        onTap: () => FlutterOverlayWindow.shareData("open_app"),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.92),
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFF00E676), width: 3),
-            boxShadow: const [
-              BoxShadow(color: Colors.black87, blurRadius: 10, offset: Offset(0, 3)),
-            ],
-          ),
-          child: const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.timer, color: Color(0xFF00E676), size: 26),
-                SizedBox(height: 2),
-                Text(
-                  "EM ROTA",
-                  style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+      type: MaterialType.transparency,
+      child: Center(
+        child: GestureDetector(
+          onTap: () async {
+            await FlutterOverlayWindow.shareData("open_app");
+          },
+          child: Container(
+            width: 78,
+            height: 78,
+            decoration: BoxDecoration(
+              color: const Color(0xEE121212),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF00E676), width: 3),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x99000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
                 ),
               ],
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    "EM ROTA",
+                    style: TextStyle(
+                      color: Color(0xFF00E676),
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _formatTime(_seconds),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1112,3 +1202,4 @@ class OverlayWidget extends StatelessWidget {
     );
   }
 }
+
