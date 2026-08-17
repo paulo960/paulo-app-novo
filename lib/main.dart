@@ -3,10 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:app_to_foreground/app_to_foreground.dart';
 
 void main() => runApp(const DriverApp());
 
-// Janela Flutuante Nativa sobreposta a outros aplicativos
+// Janela Flutuante Nativa
 @pragma("vm:entry-point")
 void overlayMain() {
   runApp(const MaterialApp(
@@ -165,9 +166,10 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
     _tabs = TabController(length: 2, vsync: this);
     _loadData();
 
-    FlutterOverlayWindow.overlayListener.listen((event) {
+    FlutterOverlayWindow.overlayListener.listen((event) async {
       if (event == "open_app") {
-        _closeNativeOverlay();
+        await _closeNativeOverlay();
+        AppToForeground.appToForeground();
       }
     });
   }
@@ -1086,7 +1088,7 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
   }
 }
 
-// Widget Flutuante Transparente com Cronômetro em Tempo Real e Abertura do App
+// Widget Flutuante Nativo
 class OverlayWidget extends StatefulWidget {
   const OverlayWidget({super.key});
 
@@ -1133,8 +1135,8 @@ class _OverlayWidgetState extends State<OverlayWidget> {
       body: Center(
         child: GestureDetector(
           onTap: () async {
+            // Emite o evento e aciona a chamada nativa de retorno em primeiro plano
             await FlutterOverlayWindow.shareData("open_app");
-            await FlutterOverlayWindow.closeOverlay();
           },
           child: Container(
             width: 74,
