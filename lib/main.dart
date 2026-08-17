@@ -166,6 +166,7 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
     _tabs = TabController(length: 2, vsync: this);
     _loadData();
 
+    // Listener para quando o overlay solicitar reabrir
     FlutterOverlayWindow.overlayListener.listen((event) async {
       if (event == "open_app") {
         await _closeNativeOverlay();
@@ -197,11 +198,12 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
       if (!isGranted) return;
       if (await FlutterOverlayWindow.isActive()) return;
 
+      // Usando focusPointer para capturar o toque diretamente no balão
       await FlutterOverlayWindow.showOverlay(
         enableDrag: true,
         overlayTitle: "Jornada em Andamento",
         overlayContent: "Paulo Luna",
-        flag: OverlayFlag.defaultFlag,
+        flag: OverlayFlag.focusPointer,
         alignment: OverlayAlignment.centerRight,
         visibility: NotificationVisibility.visibilityPublic,
         positionGravity: PositionGravity.auto,
@@ -1088,7 +1090,7 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
   }
 }
 
-// Widget Flutuante Nativo
+// Widget Flutuante Nativo Interativo
 class OverlayWidget extends StatefulWidget {
   const OverlayWidget({super.key});
 
@@ -1133,10 +1135,15 @@ class _OverlayWidgetState extends State<OverlayWidget> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Center(
-        child: GestureDetector(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(40),
           onTap: () async {
-            // Emite o evento e aciona a chamada nativa de retorno em primeiro plano
+            // Dispara para a activity principal puxar o app para a frente
             await FlutterOverlayWindow.shareData("open_app");
+            try {
+              AppToForeground.appToForeground();
+            } catch (_) {}
+            await FlutterOverlayWindow.closeOverlay();
           },
           child: Container(
             width: 74,
