@@ -28,7 +28,7 @@ jobs:
       - name: Criar projeto Flutter base
         run: |
           flutter create --org com.pauloluna --project-name paulo_luna .
-          flutter pub add shared_preferences flutter_overlay_window
+          flutter pub add shared_preferences flutter_overlay_window app_to_foreground
 
       - name: Configurar Servico e Permissoes no AndroidManifest
         run: |
