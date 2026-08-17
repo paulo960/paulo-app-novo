@@ -7,7 +7,7 @@ import 'package:app_to_foreground/app_to_foreground.dart';
 
 void main() => runApp(const DriverApp());
 
-// Janela Flutuante Nativa
+// Entry point da Janela Flutuante Nativa
 @pragma("vm:entry-point")
 void overlayMain() {
   runApp(const MaterialApp(
@@ -166,11 +166,12 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
     _tabs = TabController(length: 2, vsync: this);
     _loadData();
 
-    // Listener para quando o overlay solicitar reabrir
     FlutterOverlayWindow.overlayListener.listen((event) async {
       if (event == "open_app") {
         await _closeNativeOverlay();
-        AppToForeground.appToForeground();
+        try {
+          AppToForeground.appToForeground();
+        } catch (_) {}
       }
     });
   }
@@ -198,17 +199,16 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
       if (!isGranted) return;
       if (await FlutterOverlayWindow.isActive()) return;
 
-      // Usando focusPointer para capturar o toque diretamente no balão
       await FlutterOverlayWindow.showOverlay(
         enableDrag: true,
         overlayTitle: "Jornada em Andamento",
         overlayContent: "Paulo Luna",
-        flag: OverlayFlag.focusPointer,
+        flag: OverlayFlag.defaultFlag,
         alignment: OverlayAlignment.centerRight,
         visibility: NotificationVisibility.visibilityPublic,
         positionGravity: PositionGravity.auto,
-        height: 180,
-        width: 180,
+        height: 220,
+        width: 220,
       );
       FlutterOverlayWindow.shareData(_seconds.toString());
     } catch (_) {}
@@ -1090,7 +1090,7 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
   }
 }
 
-// Widget Flutuante Nativo Interativo
+// Widget Flutuante com Toque e Retorno ao App
 class OverlayWidget extends StatefulWidget {
   const OverlayWidget({super.key});
 
@@ -1130,24 +1130,25 @@ class _OverlayWidgetState extends State<OverlayWidget> {
     return '$h:$m:$sec';
   }
 
+  Future<void> _handleTap() async {
+    await FlutterOverlayWindow.shareData("open_app");
+    try {
+      AppToForeground.appToForeground();
+    } catch (_) {}
+    await FlutterOverlayWindow.closeOverlay();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Center(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(40),
-          onTap: () async {
-            // Dispara para a activity principal puxar o app para a frente
-            await FlutterOverlayWindow.shareData("open_app");
-            try {
-              AppToForeground.appToForeground();
-            } catch (_) {}
-            await FlutterOverlayWindow.closeOverlay();
-          },
+    return Material(
+      type: MaterialType.transparency,
+      child: Center(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _handleTap,
           child: Container(
-            width: 74,
-            height: 74,
+            width: 76,
+            height: 76,
             decoration: BoxDecoration(
               color: const Color(0xF5121212),
               shape: BoxShape.circle,
