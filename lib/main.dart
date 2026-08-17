@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() => runApp(const DriverApp());
 
-// Entry point da Janela Flutuante Nativa
+// Janela Flutuante Nativa sobreposta a outros aplicativos
 @pragma("vm:entry-point")
 void overlayMain() {
   runApp(const MaterialApp(
@@ -165,7 +165,6 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
     _tabs = TabController(length: 2, vsync: this);
     _loadData();
 
-    // Quando o usuário tocar no balão flutuante fora do app
     FlutterOverlayWindow.overlayListener.listen((event) {
       if (event == "open_app") {
         _closeNativeOverlay();
@@ -207,7 +206,6 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
         height: 180,
         width: 180,
       );
-      // Envia imediatamente os segundos atuais para o balão
       FlutterOverlayWindow.shareData(_seconds.toString());
     } catch (_) {}
   }
@@ -249,7 +247,6 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       setState(() => _seconds++);
-      // Transmite a contagem contínua para o balão flutuante nativo
       FlutterOverlayWindow.shareData(_seconds.toString());
     });
     setState(() => _running = true);
@@ -1089,7 +1086,7 @@ class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProvid
   }
 }
 
-// Widget Flutuante Transparente com Cronômetro em Tempo Real
+// Widget Flutuante Transparente com Cronômetro em Tempo Real e Abertura do App
 class OverlayWidget extends StatefulWidget {
   const OverlayWidget({super.key});
 
@@ -1104,7 +1101,6 @@ class _OverlayWidgetState extends State<OverlayWidget> {
   @override
   void initState() {
     super.initState();
-    // Escuta a transmissão contínua de segundos do app principal
     _sub = FlutterOverlayWindow.overlayListener.listen((data) {
       if (data != null) {
         final parsed = int.tryParse(data.toString());
@@ -1138,6 +1134,7 @@ class _OverlayWidgetState extends State<OverlayWidget> {
         child: GestureDetector(
           onTap: () async {
             await FlutterOverlayWindow.shareData("open_app");
+            await FlutterOverlayWindow.closeOverlay();
           },
           child: Container(
             width: 74,
