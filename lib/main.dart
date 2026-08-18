@@ -7,6 +7,48 @@ import 'package:app_to_foreground/app_to_foreground.dart';
 
 void main() => runApp(const DriverApp());
 
+// Widget Principal
+class DriverApp extends StatefulWidget {
+  const DriverApp({super.key});
+
+  @override
+  State<DriverApp> createState() => _DriverAppState();
+}
+
+class _DriverAppState extends State<DriverApp> {
+  ThemeMode _themeMode = ThemeMode.dark;
+
+  void _toggleTheme() {
+    setState(() {
+      _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Paulo Luna',
+      debugShowCheckedModeBanner: false,
+      themeMode: _themeMode,
+      theme: ThemeData(
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFF5F6F8),
+        primaryColor: const Color(0xFF00C853),
+      ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        primaryColor: const Color(0xFF00E676),
+      ),
+      home: DriverHomePage(
+        onToggleTheme: _toggleTheme,
+        isDark: _themeMode == ThemeMode.dark,
+      ),
+    );
+  }
+}
+
+// Entry point da Janela Flutuante Nativa
 @pragma("vm:entry-point")
 void overlayMain() {
   runApp(const MaterialApp(
@@ -15,41 +57,127 @@ void overlayMain() {
   ));
 }
 
-// [AS CLASSES Shift e DriverApp CONTINUAM IGUAIS, ESTOU PULARANDO PARA O OverlayWidget QUE É ONDE ESTÁ O PROBLEMA]
-// Use o código abaixo no seu arquivo, mantendo o início dele exatamente como estava antes.
+class Shift {
+  String id;
+  DateTime date;
+  int duration;
+  double km;
+  double fuel;
+  double gross;
 
-// ... (Mantenha Shift, DriverApp e DriverHomePage como estão) ...
+  Shift({
+    required this.id,
+    required this.date,
+    required this.duration,
+    required this.km,
+    required this.fuel,
+    required this.gross,
+  });
 
-// O PROBLEMA ESTÁ AQUI. Substitua todo o seu OverlayWidget por este bloco:
+  double get net => gross - fuel;
 
-class OverlayWidget extends StatefulWidget {
-  const OverlayWidget({super.key});
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'date': date.toIso8601String(),
+        'duration': duration,
+        'km': km,
+        'fuel': fuel,
+        'gross': gross,
+      };
 
-  @override
-  State<OverlayWidget> createState() => _OverlayWidgetState();
+  factory Shift.fromMap(Map<String, dynamic> map) => Shift(
+        id: map['id'],
+        date: DateTime.parse(map['date']),
+        duration: map['duration'],
+        km: (map['km'] as num).toDouble(),
+        fuel: (map['fuel'] as num).toDouble(),
+        gross: (map['gross'] as num).toDouble(),
+      );
 }
 
-class _OverlayWidgetState extends State<OverlayWidget> {
+class DriverHomePage extends StatefulWidget {
+  final VoidCallback onToggleTheme;
+  final bool isDark;
+
+  const DriverHomePage({
+    super.key,
+    required this.onToggleTheme,
+    required this.isDark,
+  });
+
+  @override
+  State<DriverHomePage> createState() => _DriverHomePageState();
+}
+
+class _DriverHomePageState extends State<DriverHomePage> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late TabController _tabs;
+  Timer? _timer;
   int _seconds = 0;
-  StreamSubscription? _sub;
+  bool _running = false;
+  List<Shift> _shifts = [];
 
   @override
   void initState() {
     super.initState();
-    _sub = FlutterOverlayWindow.overlayListener.listen((data) {
-      if (data != null && mounted) {
-        final parsed = int.tryParse(data.toString());
-        if (parsed != null) {
-          setState(() => _seconds = parsed);
-        }
+    WidgetsBinding.instance.addObserver(this);
+    _tabs = TabController(length: 2, vsync: this);
+    
+    FlutterOverlayWindow.overlayListener.listen((event) async {
+      if (event == "open_app") {
+        await _closeNativeOverlay();
+        try {
+          AppToForeground.appToForeground();
+        } catch (_) {}
       }
     });
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_running) {
+      if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+        _showNativeOverlay();
+      } else if (state == AppLifecycleState.resumed) {
+        _closeNativeOverlay();
+      }
+    }
+  }
+
+  Future<void> _showNativeOverlay() async {
+    try {
+      if (await FlutterOverlayWindow.isActive()) return;
+      await FlutterOverlayWindow.showOverlay(
+        enableDrag: true,
+        overlayTitle: "Jornada",
+        flag: OverlayFlag.defaultFlag,
+        height: 220,
+        width: 220,
+      );
+      FlutterOverlayWindow.shareData(_seconds.toString());
+    } catch (_) {}
+  }
+
+  Future<void> _closeNativeOverlay() async {
+    try {
+      if (await FlutterOverlayWindow.isActive()) {
+        await FlutterOverlayWindow.closeOverlay();
+      }
+    } catch (_) {}
+  }
+
+  void _start() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      setState(() => _seconds++);
+      FlutterOverlayWindow.shareData(_seconds.toString());
+    });
+    setState(() => _running = true);
   }
 
   String _formatTime(int s) {
@@ -61,53 +189,54 @@ class _OverlayWidgetState extends State<OverlayWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // GestureDetector deve envolver tudo e ter comportamento Translucent
+    return Scaffold(
+      appBar: AppBar(title: const Text('Paulo Luna')),
+      body: Center(
+        child: Column(
+          children: [
+             Text(_formatTime(_seconds), style: const TextStyle(fontSize: 40)),
+             ElevatedButton(onPressed: _running ? () => setState(() => _running=false) : _start, child: Text(_running ? "Parar" : "Iniciar")),
+          ]
+        ),
+      ),
+    );
+  }
+}
+
+class OverlayWidget extends StatefulWidget {
+  const OverlayWidget({super.key});
+
+  @override
+  State<OverlayWidget> createState() => _OverlayWidgetState();
+}
+
+class _OverlayWidgetState extends State<OverlayWidget> {
+  int _seconds = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    FlutterOverlayWindow.overlayListener.listen((data) {
+      if (data != null && mounted) {
+        setState(() => _seconds = int.tryParse(data.toString()) ?? 0);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      behavior: HitTestBehavior.translucent, 
+      behavior: HitTestBehavior.translucent,
       onTap: () async {
         await FlutterOverlayWindow.shareData("open_app");
-        try {
-          AppToForeground.appToForeground();
-        } catch (_) {}
-        await FlutterOverlayWindow.closeOverlay();
       },
       child: Material(
         type: MaterialType.transparency,
         child: Center(
           child: Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
-              color: const Color(0xF5121212),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF00E676), width: 2.8),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "EM ROTA",
-                    style: TextStyle(
-                      color: Color(0xFF00E676),
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    _formatTime(_seconds),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            width: 76, height: 76,
+            decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+            child: Center(child: Text("$_seconds", style: const TextStyle(color: Colors.white))),
           ),
         ),
       ),
